@@ -9,10 +9,17 @@
         android:layout_width="fill_parent"
         android:layout_height="wrap_content"
         android:text="@string/hello" />
+
     <TextView
         android:id="@+id/zip"
         android:layout_width="fill_parent"
         android:layout_height="wrap_content"
         android:text="@string/hello" />
+
+    <include
+        android:id="@+id/include1"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        layout="@layout/list_item" />
 
 </LinearLayout>
