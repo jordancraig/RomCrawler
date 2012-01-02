@@ -18,147 +18,137 @@ import org.jsoup.select.Elements;
 
 import android.app.ListActivity;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Message;
 
 import android.util.Log;
+import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.TextView;
 
 public class POCActivity extends ListActivity  {
-	TextView mURLText;
-	TextView mZipText;
-	String mLinkURL;
-	String mURLURL ="http://rootzwiki.com/topic/12083-unsecured-stock-bootimg402/page__fromsearch__1";
-	//String mURLURL = "http://rootzwiki.com/topic/12451-rom-android-open-kang-project-toro-build-2012-dec-31/";
-	static String finalName;
+	String[] mURLURLS;
     private ArrayAdapter<String> linkArrayAdapter;
     ArrayList<String> linkArray;
     Elements links;
-    String strClean;
-    Document doc;
+    Thread getNameThread;
 
 	
     /** Called when the activity is first created. */
     @Override
-    public void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
+    public void onCreate(Bundle icicle) {
+        super.onCreate(icicle);
+        setContentView(R.layout.main);
+ 
 
+        getNameThread = new Thread();
         linkArray = new ArrayList<String>();
-        linkArrayAdapter = new ArrayAdapter<String>(this, R.layout.list_item,
-            R.id.itemName, linkArray);
-        
-        try {
-        getNames();
-        } catch (Exception e) {
-        	e.printStackTrace();
-        }
-
+        mURLURLS = new String[] {"http://rootzwiki.com/topic/12083-unsecured-stock-bootimg402/", "http://rootzwiki.com/topic/12451-rom-android-open-kang-project-toro-build-2012-dec-31/"};	        
+		for (int i=0; i<mURLURLS.length; i++) {
+	        getListView().addHeaderView(buildHeader(mURLURLS[i]));
+	        try {
+				getNames(mURLURLS[i]);
+			} catch (IOException e) {
+				e.printStackTrace();
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+		}
+		try {
+			getLinks();
+		} catch (IOException e) {
+			e.printStackTrace();
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+		cleanList();
     }
 
-	public void getNames() throws IOException {
-	    new Thread(new Runnable() {
-	    	public void run() {
-	    		try {
-	    			URL url = new URL(mURLURL);
-	    			URLConnection con = url.openConnection();
-	    			Pattern p = Pattern.compile("text/html;\\s+charset=([^\\s]+)\\s*");
-	    			Matcher m = p.matcher(con.getContentType());
+	public void getNames(final String mURLURLS) throws IOException, InterruptedException {
+		Thread getNameThread = new Thread() {
+			public void run() {
+				try {
+					URL url = new URL(mURLURLS);
+					URLConnection con = url.openConnection();
+					Pattern p = Pattern.compile("text/html;\\s+charset=([^\\s]+)\\s*");
+					Matcher m = p.matcher(con.getContentType());
+					String charset = m.matches() ? m.group(1) : "ISO-8859-1";
+					Reader r = new InputStreamReader(con.getInputStream(), charset);
+					StringBuilder buf = new StringBuilder();
+					while (true) {
+						int ch = r.read();
+						if (ch < 0)
+							break;
+						buf.append((char) ch);
+					}
+					String strMessy = buf.toString();
+					String strClean = new String (strMessy.replaceAll("\\<.*?>",""));
+					while (strClean.contains(".zip")){
+						String trimmed = strClean.substring(0, strClean.lastIndexOf(".zip"));
+						String[] parts = trimmed.split("\n");
+						String lastWord = parts[parts.length - 1] + ".zip";
+						strClean = new String(strClean.replace(lastWord, ""));
+						linkArray.add(lastWord);
+					}
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+			}
+		};
+		Log.d("POC", "GETNAMETHREAD IS FINISHED!");
+		getNameThread.start();
+		getNameThread.join();
+	} 	
+	
+	public void getLinks() throws IOException, InterruptedException {
+		Thread getLinksThread = new Thread() {
+			public void run() {
+	       		try {
+					getNameThread.join();
+				} catch (InterruptedException e1) {
+					// TODO Auto-generated catch block
+					e1.printStackTrace();
+				}
 
-	    			String charset = m.matches() ? m.group(1) : "ISO-8859-1";
-	    			Reader r = new InputStreamReader(con.getInputStream(), charset);
-	    			StringBuilder buf = new StringBuilder();
-	    			while (true) {
-	    				int ch = r.read();
-	    				if (ch < 0)
-	    					break;
-	    				buf.append((char) ch);
-	    			}
-	    			String strMessy = buf.toString();
-	    			strClean = strMessy.replaceAll("\\<.*?>","");
-		        	POCActivity.this.runOnUiThread(new Runnable() {
-	        		@Override
-	        			public void run() {
-	        				getFinalName(strClean);
-	        			}
-		        	});			    			
-	    		} catch (Exception e) {
-	    			e.printStackTrace();
-	    		}
-	    	}
-	    }).start();
-    }
-    	
-	public void getLinks() throws IOException {
-		new Thread(new Runnable() {
-	           public void run() {
-	            	mURLURL = "http://rootzwiki.com/topic/12083-unsecured-stock-bootimg402/";
+	    		for (int i=0; i<mURLURLS.length; i++) {
 					try {
-						doc = Jsoup.connect(mURLURL).get();
+						Document doc = Jsoup.connect(mURLURLS[i]).get();
+	        			Elements links = doc.select("a[href]");
+        				for (Element link : links) {
+        					for (Iterator<String> c = linkArray.iterator(); c.hasNext();) {
+        						String newName = c.next();
+		       					if (link.attr("abs:href").contains(newName)) {		        						
+		       						c.remove();
+		       						//addList.add(link.attr("abs:href").toString());
+		       					}
+        					}
+        					if (link.attr("abs:href").contains(".zip")) {	
+       							linkArray.add(link.attr("abs:href"));
+       						}
+       					}
 					} catch (IOException e) {
 						// TODO Auto-generated catch block
 						e.printStackTrace();
 					}
-		        	POCActivity.this.runOnUiThread(new Runnable() {
-		        		@Override
-		        		public void run() {
-		        			Elements links = doc.select("a[href]");
-		        				for (Element link : links) {
-				        			for (int i=0; i<linkArrayAdapter.getCount(); i++) {
-				        				finalName = linkArrayAdapter.getItem(i);
-				       					if (link.attr("abs:href").contains(finalName)) {
-				       						linkArrayAdapter.remove(finalName);
-				       						linkArrayAdapter.add(link.attr("abs:href"));
-				       					}
-				       				}
-		        					if (link.attr("abs:href").contains(".zip")) {	
-		       							linkArrayAdapter.add(link.attr("abs:href"));
-		       						}
-		       					}
-		        			setList();
-			        	}
-				    });
+	    		}
             } 
-		}).start();
+		};
+		getLinksThread.start();
+		getLinksThread.join();
     }
     
 	@SuppressWarnings({ "unchecked", "rawtypes" })
-	public void setList() {
+	public void cleanList() {
 		HashSet hashSet = new HashSet(linkArray);
  	    linkArray = new ArrayList(hashSet);
-		for (Iterator c = linkArray.iterator(); c.hasNext();) {
-			Log.d("POC", (String)c.next());
-		}
 	    linkArrayAdapter = new ArrayAdapter<String>(this, R.layout.list_item,
              R.id.itemName, linkArray);
         setListAdapter(linkArrayAdapter);
 	}
-	
-    public void getFinalName(String strClean) {
-    	//should loop through until string no longer contains any .zip files.
-    	while (strClean.contains(".zip")){
-    		String trimmed = strClean.substring(0, strClean.lastIndexOf(".zip"));
-    		String[] parts = trimmed.split("\n");
-    		String lastWord = parts[parts.length - 1] + ".zip";
-    		finalName = lastWord;
-    		strClean = new String(strClean.replace(finalName, ""));
-			linkArrayAdapter.add(finalName);
-    	}
-    	mHandler.sendEmptyMessage(0);
-    }
     
-	final Handler mHandler = new Handler(){ 
-        public void handleMessage (Message  msg) {
-        	switch (msg.what) {
-        	case 0:
-           		try {
-        			getLinks();
-        		} catch (IOException e) {
-        			// TODO Auto-generated catch block
-        			e.printStackTrace();
-        		}
-        		break;
-        	}
-        } 
-	}; 
+    private View buildHeader(String mURLURLS) {
+    	TextView header = new TextView(this);
+    	header.setText(mURLURLS);
+    	header.setBackgroundResource(R.drawable.dialog_full_holo_dark);
+    	header.setTextColor(getResources().getColor(R.color.ics));
+    	return header;
+      }
 }
