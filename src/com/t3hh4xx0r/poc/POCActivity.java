@@ -6,6 +6,7 @@ import java.io.Reader;
 import java.net.URL;
 import java.net.URLConnection;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.regex.Matcher;
@@ -15,6 +16,8 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+
+import com.commonsware.cwac.merge.MergeAdapter;
 
 import android.app.ListActivity;
 import android.os.Bundle;
@@ -26,6 +29,8 @@ import android.widget.TextView;
 
 public class POCActivity extends ListActivity  {
 	String[] mURLURLS;
+	private MergeAdapter adapter=null;
+	private ArrayAdapter<String> arrayAdapter=null;
     private ArrayAdapter<String> linkArrayAdapter;
     ArrayList<String> linkArray;
     Elements links;
@@ -37,13 +42,14 @@ public class POCActivity extends ListActivity  {
     public void onCreate(Bundle icicle) {
         super.onCreate(icicle);
         setContentView(R.layout.main);
- 
 
         getNameThread = new Thread();
         linkArray = new ArrayList<String>();
         mURLURLS = new String[] {"http://rootzwiki.com/topic/12083-unsecured-stock-bootimg402/", "http://rootzwiki.com/topic/12451-rom-android-open-kang-project-toro-build-2012-dec-31/"};	        
+
+        adapter = new MergeAdapter();
+
 		for (int i=0; i<mURLURLS.length; i++) {
-	        getListView().addHeaderView(buildHeader(mURLURLS[i]));
 	        try {
 				getNames(mURLURLS[i]);
 			} catch (IOException e) {
@@ -52,16 +58,23 @@ public class POCActivity extends ListActivity  {
 				e.printStackTrace();
 			}
 		}
-		try {
-			getLinks();
-		} catch (IOException e) {
-			e.printStackTrace();
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		}
-		cleanList();
+		createUI();
+//		try {
+//			getLinks();
+//		} catch (IOException e) {
+//			e.printStackTrace();
+//		} catch (InterruptedException e) {
+//			e.printStackTrace();
+//		}
+//		for (int i=0; i<mURLURLS.length; i++) {
+//			cleanList(mURLURLS[i]);
+//		}
     }
 
+    private ArrayAdapter<String> buildList(ArrayList<String> linkArray) {
+        return(new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, linkArray));
+      }
+    
 	public void getNames(final String mURLURLS) throws IOException, InterruptedException {
 		Thread getNameThread = new Thread() {
 			public void run() {
@@ -88,6 +101,20 @@ public class POCActivity extends ListActivity  {
 						strClean = new String(strClean.replace(lastWord, ""));
 						linkArray.add(lastWord);
 					}
+					Document doc = Jsoup.connect(mURLURLS).get();
+        			Elements links = doc.select("a[href]");
+    				for (Element link : links) {
+    					for (Iterator<String> c = linkArray.iterator(); c.hasNext();) {
+    						String newName = c.next();
+	       					if (link.attr("abs:href").contains(newName)) {		        						
+	       						c.remove();
+	       						//addList.add(link.attr("abs:href").toString());
+	       					}
+    					}
+    					if (link.attr("abs:href").contains(".zip")) {	
+   							linkArray.add(link.attr("abs:href"));
+   						}
+   					}
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
@@ -96,52 +123,62 @@ public class POCActivity extends ListActivity  {
 		Log.d("POC", "GETNAMETHREAD IS FINISHED!");
 		getNameThread.start();
 		getNameThread.join();
+		setUI(mURLURLS);
 	} 	
 	
-	public void getLinks() throws IOException, InterruptedException {
-		Thread getLinksThread = new Thread() {
-			public void run() {
-	       		try {
-					getNameThread.join();
-				} catch (InterruptedException e1) {
-					// TODO Auto-generated catch block
-					e1.printStackTrace();
-				}
-
-	    		for (int i=0; i<mURLURLS.length; i++) {
-					try {
-						Document doc = Jsoup.connect(mURLURLS[i]).get();
-	        			Elements links = doc.select("a[href]");
-        				for (Element link : links) {
-        					for (Iterator<String> c = linkArray.iterator(); c.hasNext();) {
-        						String newName = c.next();
-		       					if (link.attr("abs:href").contains(newName)) {		        						
-		       						c.remove();
-		       						//addList.add(link.attr("abs:href").toString());
-		       					}
-        					}
-        					if (link.attr("abs:href").contains(".zip")) {	
-       							linkArray.add(link.attr("abs:href"));
-       						}
-       					}
-					} catch (IOException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
-					}
-	    		}
-            } 
-		};
-		getLinksThread.start();
-		getLinksThread.join();
-    }
+//	public void getLinks() throws IOException, InterruptedException {
+//		Thread getLinksThread = new Thread() {
+//			public void run() {
+//	       		try {
+//					getNameThread.join();
+//				} catch (InterruptedException e1) {
+//					// TODO Auto-generated catch block
+//					e1.printStackTrace();
+//				}
+//
+//	    		for (int i=0; i<mURLURLS.length; i++) {
+//					try {
+//						Document doc = Jsoup.connect(mURLURLS[i]).get();
+//	        			Elements links = doc.select("a[href]");
+//        				for (Element link : links) {
+//        					for (Iterator<String> c = linkArray.iterator(); c.hasNext();) {
+//        						String newName = c.next();
+//		       					if (link.attr("abs:href").contains(newName)) {		        						
+//		       						c.remove();
+//		       						//addList.add(link.attr("abs:href").toString());
+//		       					}
+//        					}
+//        					if (link.attr("abs:href").contains(".zip")) {	
+//       							linkArray.add(link.attr("abs:href"));
+//       						}
+//       					}
+//					} catch (IOException e) {
+//						// TODO Auto-generated catch block
+//						e.printStackTrace();
+//					}
+//	    		}
+//            } 
+//		};
+//		getLinksThread.start();
+//		getLinksThread.join();
+//    }
     
 	@SuppressWarnings({ "unchecked", "rawtypes" })
-	public void cleanList() {
+	public void setUI(String mURLURLS) {
 		HashSet hashSet = new HashSet(linkArray);
  	    linkArray = new ArrayList(hashSet);
-	    linkArrayAdapter = new ArrayAdapter<String>(this, R.layout.list_item,
-             R.id.itemName, linkArray);
-        setListAdapter(linkArrayAdapter);
+//	    linkArrayAdapter = new ArrayAdapter<String>(this, R.layout.list_item,
+//             R.id.itemName, linkArray);
+//	    adapter.addAdapter(linkArrayAdapter);
+//        setListAdapter(linkArrayAdapter);
+        arrayAdapter = buildList(linkArray);
+        adapter.addView(buildHeader(mURLURLS));
+        adapter.addAdapter(arrayAdapter);
+        //setListAdapter(adapter);
+	}
+	
+	public void createUI() {
+        setListAdapter(adapter);
 	}
     
     private View buildHeader(String mURLURLS) {
