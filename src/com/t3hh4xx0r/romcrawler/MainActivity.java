@@ -1,32 +1,35 @@
 package com.t3hh4xx0r.romcrawler;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.ArrayList;
+import java.util.Iterator;
 
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
+import org.jsoup.parser.Parser;
 import org.jsoup.select.Elements;
 
-import android.app.ListActivity;
+import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Message;
 import android.util.Log;
 import android.view.View;
-import android.widget.ArrayAdapter;
+import android.widget.AdapterView;
+import android.widget.AdapterView.OnItemClickListener;
 import android.widget.ListView;
 import android.widget.Toast;
 
-
-public class MainActivity extends ListActivity {
+public class MainActivity extends Activity {
     ArrayList<String> threadArray;
-    ArrayList<String> titleArray;
-    private ArrayAdapter<String> titleArrayAdapter;
+    ArrayList<String> authorArray;
     String message;
     String threadTitle = null;
-
 
 	/** Called when the activity is first created. */
     @Override
@@ -34,19 +37,32 @@ public class MainActivity extends ListActivity {
         super.onCreate(icicle);
         setContentView(R.layout.main);
         
+        final ListView lv1 = (ListView) findViewById(R.id.listView);
         threadArray = new ArrayList<String>();
-        titleArray = new ArrayList<String>();
-        titleArrayAdapter = new ArrayAdapter<String>(this, R.layout.list_item,
-            R.id.itemName, titleArray);
+        authorArray = new ArrayList<String>();
 
         getDevice();
+        
+        lv1.setOnItemClickListener(new OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> a, View v, int position, long id) { 
+             Object o = lv1.getItemAtPosition(position);
+             TitleResults fullObject = (TitleResults)o;
+             threadTitle = fullObject.getItemName();
+             Constants.THREADURL = threadArray.get(position);
+             Intent intent = new Intent(MainActivity.this, ThreadActivity.class);
+             Bundle b = new Bundle();
+             b.putString("title", threadTitle);
+             intent.putExtras(b);
+             startActivity(intent);    	
+            }  
+           });
+        
         if(Constants.DEVICE != null){
-        	try {
-        		getThreads();
-        	} catch (IOException e) {
-        		e.printStackTrace();
-        	}
-        }
+            ArrayList<TitleResults> titleArray = getTitles();
+            lv1.setAdapter(new TitleAdapter(this, titleArray)); 
+            }
+        Log.d("POC", "AUTHORARRAY SIZE: " + authorArray.size() + " THREADARRAY SIZE: " + threadArray.size());
     }
     
     public void getDevice() {
@@ -61,63 +77,81 @@ public class MainActivity extends ListActivity {
     	makeToast(message);
     }
     
-    @Override
-    protected void onListItemClick(ListView l, View v, int position, long id) {
-    	super.onListItemClick(l, v, position, id);
-        Constants.THREADURL = threadArray.get(position);
-        threadTitle = titleArray.get(position);
-    	Log.d("POC", "clicked: " + threadArray.get(position));
-        Intent intent = new Intent(MainActivity.this, ThreadActivity.class);
-        Bundle b = new Bundle();
-        b.putString("title", threadTitle);
-        intent.putExtras(b);
-        startActivity(intent);    	
-    }
-    
-	public void getThreads() throws IOException {
-		Thread getThreadsThread = new Thread() {
+    private ArrayList<TitleResults> getTitles(){
+        final ArrayList<TitleResults> results = new ArrayList<TitleResults>();
+
+        Thread getTitlesThread = new Thread() {
 			public void run() {
-					Document doc = null;
+		        TitleResults titleArray =  new TitleResults();
+				StringBuilder whole = new StringBuilder();
+
+				try {
+					URL url = new URL(
+							Constants.FORUM);
+					HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
+					urlConnection.setRequestProperty("User-Agent", "Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10.4; en-US; rv:1.9.2.2) Gecko/20100316 Firefox/3.6.2");
 					try {
-						doc = Jsoup.connect(Constants.FORUM).get();
+						BufferedReader in = new BufferedReader(
+							new InputStreamReader(new BufferedInputStream(urlConnection.getInputStream())));
+						String inputLine;
+						while ((inputLine = in.readLine()) != null)
+							whole.append(inputLine);
+						in.close();
 					} catch (IOException e) {
-						e.printStackTrace();
+						Log.e("POC", e.getMessage());
+					} finally {
+						urlConnection.disconnect();
 					}
-					Elements threads = doc.select(".topic_title");
-		       		for (Element thread : threads) {
-		       			String threadStr = thread.attr("abs:href");
-		       			threadTitle = thread.text();
-		       			String endTag = "/page__view__getnewpost";
-						threadStr = new String(threadStr.replace(endTag, ""));
-						titleArray.add(threadTitle);
-		       			threadArray.add(threadStr);
-		       		}
-            } 
+				} catch (Exception e) {
+					Log.e("POC", e.getMessage());
+				}
+				Document doc = Parser.parse(whole.toString(), Constants.FORUM);
+				Elements threads = doc.select(".topic_title");
+		       	Elements authors = doc.select("a[hovercard-ref]");
+	      		for (Element author : authors) {
+	       			authorArray.add(author.text());
+	      		}
+	      		cleanAuthors();
+
+	       		for (Element thread : threads) {
+	       			titleArray =  new TitleResults();
+
+	       			titleArray.setAuthorDate(authorArray.get(0));
+	       			authorArray.remove(0);
+	       			
+	       			//Thread title
+	       			threadTitle = thread.text();
+	       			titleArray.setItemName(threadTitle);
+		       		
+	       			//Thread link
+	       			String threadStr = thread.attr("abs:href");
+	       			String endTag = "/page__view__getnewpost"; //trim link
+	       			threadStr = new String(threadStr.replace(endTag, ""));
+	       			threadArray.add(threadStr);
+					results.add(titleArray);
+	       		}
+           } 
 		};
-		getThreadsThread.start();
+		getTitlesThread.start();
 		try {
-			getThreadsThread.join();
+			getTitlesThread.join();
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
-    	mHandler.sendEmptyMessage(0);
+		return results;
     }
-	
-	final Handler mHandler = new Handler(){ 
-        public void handleMessage (Message  msg) {
-        	switch (msg.what) {
-        	case 0:
-	        	MainActivity.this.runOnUiThread(new Runnable() {
-	        		@Override
-	        		public void run() {
-	        			setListAdapter(titleArrayAdapter);
-	        		}
-	        	});
-        		break;
-        	}
-        } 
-	}; 
 
+    public void cleanAuthors() {
+        ArrayList<String> tmpArray = new ArrayList<String>();
+		for (int i=2; i<authorArray.size(); i++) {
+	        tmpArray.add(authorArray.get(i));
+		}
+		authorArray = new ArrayList<String>();
+		for (int i=0; i<tmpArray.size(); i += 2) {
+			authorArray.add(tmpArray.get(i));
+		}
+    }
+    
 	public void makeToast(String message) {
 		Toast.makeText(this, message, Toast.LENGTH_LONG).show();
 	}

@@ -26,6 +26,7 @@ import android.net.Uri;
 import android.os.Bundle;
 
 import android.util.Log;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
@@ -47,7 +48,6 @@ public class ThreadActivity extends ListActivity  {
     @Override
     public void onCreate(Bundle icicle) {
         super.onCreate(icicle);
-        setContentView(R.layout.main);
 
         getNameThread = new Thread();
         linkArray = new ArrayList<String>();
@@ -168,5 +168,19 @@ public class ThreadActivity extends ListActivity  {
     
 	public void makeToast(String message) {
 		Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+	}
+	
+	@Override
+	public boolean onOptionsItemSelected(MenuItem item) {
+	    switch (item.getItemId()) {
+	        case android.R.id.home:
+	            // app icon in action bar clicked; go home
+	            Intent intent = new Intent(this, MainActivity.class);
+	            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+	            startActivity(intent);
+	            return true;
+	        default:
+	            return super.onOptionsItemSelected(item);
+	    }
 	}
 }
