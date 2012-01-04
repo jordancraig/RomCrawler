@@ -14,6 +14,12 @@ public enum DeviceType {
 	   PASSION("http://rootzwiki.com/forum/75-nexus-one-developer-forum");
 	   PYRAMID("http://rootzwiki.com/forum/88-sensation-4g-development-forum");
 	   MECHA("http://rootzwiki.com/forum/12-thunderbolt-developer-forum");
+	   BIONIC("http://rootzwiki.com/forum/82-droid-bionic-developer-forum");
+	   ATRIX("http://rootzwiki.com/forum/44-atrix-developer-forum");
+	   RAZR("http://rootzwiki.com/forum/338-droid-razr-developer-forum");
+	   CAPTIVATE("http://rootzwiki.com/forum/69-captivate-developer-forum");
+	   ACE("http://rootzwiki.com/forum/137-galaxy-ace-developer-forum");
+	   VIBRANT("http://rootzwiki.com/forum/94-vibrant-developer-forum");
 	   
 
 	   
